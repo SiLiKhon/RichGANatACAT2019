@@ -2,3 +2,4 @@
 __pycache__/
 *.pkl
 *.pdf
+exported_model_tfScaler_attached/
