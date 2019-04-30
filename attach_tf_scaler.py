@@ -15,21 +15,23 @@ from sklearn.externals import joblib
 from make_prediction import DataSplits
 
 utils_rich = utils_rich_mrartemev
-particles = ['kaon', 'pion', 'proton', 'muon']
+particles = ['kaon', 'kaon_full', 'pion', 'proton', 'muon']
 
 os.environ['CUDA_DEVICE_ORDER']='PCI_BUS_ID'
-os.environ['CUDA_VISIBLE_DEVICES']='1'
+os.environ['CUDA_VISIBLE_DEVICES']='0'
 
 data_full = {
-    particle : utils_rich.load_and_merge_and_cut(utils_rich.datasets[particle])
+    particle : utils_rich.load_and_merge_and_cut(utils_rich.datasets[particle.replace('_full', '')])
     for particle in particles
 }
 
 
-models_path = "/home/martemev/data/Lambda/RICH-GAN/research/exported_model/"
-preprocessors_path = "/home/martemev/data/Lambda/RICH-GAN/research/preprocessors/"
+#models_path = "/home/martemev/data/Lambda/RICH-GAN/research/exported_model/"
+models_path = "/home/amaevskiy/data/RICH-GAN/martemev_models/exported_model/"
+#preprocessors_path = "/home/martemev/data/Lambda/RICH-GAN/research/preprocessors/"
+preprocessors_path = "/home/amaevskiy/data/RICH-GAN/martemev_models/preprocessors/"
 
-export_models_path = "exported_model_tfScaler_attached/"
+export_models_path = "exported_model_tfScaler_attached_v3/"
 
 model_name_format = "FastFastRICH_Cramer_{}"
 preprocessor_name_format = "FastFastRICH_Cramer_{}_preprocessor.pkl"
@@ -82,7 +84,17 @@ for particle in particles:
             sub_graph_def = tf.graph_util.convert_variables_to_constants(
                 sess, sess.graph_def, [output_tensor.op.name]
             )
-            print("Sub-graph created")
+
+            # Removing unnecessary copies of data:
+            rm_idx = []
+            for i, func in enumerate(sub_graph_def.library.function):
+                if 'make_dataset' in func.signature.name:
+                    rm_idx.append(i)
+            rm_idx = sorted(rm_idx, reverse=True)
+            for i in rm_idx:
+                sub_graph_def.library.function.remove(sub_graph_def.library.function[i])
+
+            print("Sub-graph created. Size : O({:.3}) MB".format(len(str(sub_graph_def)) / 1024**2))
     
     reduced_graph = tf.Graph()
     with reduced_graph.as_default():
@@ -117,5 +129,5 @@ splits = {
     for particle in particles
 }
 
-pd.to_pickle(splits, 'predictions_with_tfScaler.pkl')
+pd.to_pickle(splits, 'predictions_with_tfScaler_v3.pkl')
 print("Saved predictions to pickle")
